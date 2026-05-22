@@ -20,12 +20,12 @@ export default async function HomePage() {
             <h1 className="text-2xl font-bold">TLM Assessment Portal</h1>
             <p className="text-blue-100 text-sm">Computer-Based Test</p>
           </div>
-          <Link
+          {/* <Link
             href="/admin/login"
             className="text-sm bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition"
           >
             Admin Login
-          </Link>
+          </Link> */}
         </div>
       </header>
 
