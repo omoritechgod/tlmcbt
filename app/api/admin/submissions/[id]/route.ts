@@ -43,8 +43,58 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       scoreBreakdown: breakdown,
     });
 
+    // If email failed, surface the error and don't mark as released
+    if ((emailResult as any).error) {
+      return NextResponse.json(
+        {
+          error: `Grades saved, but email failed to send: ${(emailResult as any).error}. Check SMTP settings.`,
+          email: emailResult,
+        },
+        { status: 500 }
+      );
+    }
+
     await releaseSubmission(params.id);
     return NextResponse.json({ ok: true, email: emailResult });
+  }
+
+  if (action === 'resend') {
+    // Re-send email for already-released submission
+    if (submission.status !== 'released' && submission.status !== 'graded') {
+      return NextResponse.json(
+        { error: 'Can only resend graded or released submissions' },
+        { status: 400 }
+      );
+    }
+    const course = getCourse(submission.course_id);
+    const breakdown =
+      course?.questions.map((q) => ({
+        question: q.question,
+        score: submission.scores?.[q.id] || 0,
+        max: q.maxScore,
+      })) || [];
+
+    const emailResult = await sendResultsEmail({
+      to: submission.student_email,
+      studentName: submission.student_name,
+      courseName: course?.name || submission.course_id,
+      totalScore: submission.total_score || 0,
+      maxTotal: submission.max_total || 0,
+      feedback: submission.admin_feedback || undefined,
+      scoreBreakdown: breakdown,
+    });
+
+    if ((emailResult as any).error) {
+      return NextResponse.json(
+        {
+          error: `Email failed to send: ${(emailResult as any).error}`,
+          email: emailResult,
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, email: emailResult, resent: true });
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

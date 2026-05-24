@@ -1,8 +1,28 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const SMTP_HOST = process.env.SMTP_HOST || 'smtppro.zoho.com';
+const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASSWORD = process.env.SMTP_PASSWORD || '';
+const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER;
 
-const FROM = process.env.EMAIL_FROM || 'TLM Results <onboarding@resend.dev>';
+let transporter: nodemailer.Transporter | null = null;
+
+function getTransporter() {
+  if (!SMTP_USER || !SMTP_PASSWORD) return null;
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465, // true for 465, false for 587
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASSWORD,
+      },
+    });
+  }
+  return transporter;
+}
 
 export async function sendResultsEmail(params: {
   to: string;
@@ -13,10 +33,11 @@ export async function sendResultsEmail(params: {
   feedback?: string;
   scoreBreakdown: Array<{ question: string; score: number; max: number }>;
 }) {
-  if (!resend) {
-    console.log('[EMAIL DISABLED] Would have sent results to', params.to);
+  const t = getTransporter();
+  if (!t) {
+    console.log('[EMAIL DISABLED - no SMTP creds] Would have sent to', params.to);
     console.log(params);
-    return { skipped: true };
+    return { skipped: true, reason: 'No SMTP credentials configured' };
   }
 
   const percentage = Math.round((params.totalScore / params.maxTotal) * 100);
@@ -84,15 +105,15 @@ export async function sendResultsEmail(params: {
   `;
 
   try {
-    const result = await resend.emails.send({
-      from: FROM,
+    const result = await t.sendMail({
+      from: EMAIL_FROM,
       to: params.to,
       subject: `Your TLM ${params.courseName} Results`,
       html,
     });
-    return { success: true, result };
-  } catch (err) {
+    return { success: true, messageId: result.messageId };
+  } catch (err: any) {
     console.error('Email send failed:', err);
-    return { error: String(err) };
+    return { error: err?.message || String(err) };
   }
 }

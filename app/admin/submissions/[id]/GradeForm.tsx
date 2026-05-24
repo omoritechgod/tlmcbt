@@ -72,6 +72,24 @@ export default function GradeForm({
     setSaving(false);
   };
 
+  const resendEmail = async () => {
+    if (!confirm('Resend the results email to ' + submission.student_email + '?')) return;
+    setSaving(true);
+    setMessage('');
+    const res = await fetch(`/api/admin/submissions/${submission.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resend' }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMessage('\u2713 Email resent successfully');
+    } else {
+      setMessage('Resend failed: ' + (data.error || 'unknown error'));
+    }
+    setSaving(false);
+  };
+
   return (
     <>
       <div className="space-y-4">
@@ -168,10 +186,21 @@ export default function GradeForm({
               </button>
             )}
             {isReleased && (
-              <div className="text-sm text-green-700 bg-green-50 px-4 py-2 rounded-lg">
-                \u2713 Released on {submission.released_at
-                  ? new Date(submission.released_at).toLocaleString()
-                  : ''}
+              <div className="flex items-center gap-2">
+                <div className="text-sm text-green-700 bg-green-50 px-4 py-2 rounded-lg">
+                  \u2713 Released on{' '}
+                  {submission.released_at
+                    ? new Date(submission.released_at).toLocaleString()
+                    : ''}
+                </div>
+                <button
+                  onClick={resendEmail}
+                  className="btn-secondary text-sm"
+                  disabled={saving}
+                  title="Resend the results email to the student"
+                >
+                  {saving ? 'Sending...' : '\u21bb Resend Email'}
+                </button>
               </div>
             )}
           </div>
